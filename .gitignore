@@ -1,0 +1,7 @@
+# Dossiers exclus
+Archives/
+.vscode/
+.github/
+
+# Workspace local
+GRiftTimerPlugin.code-workspace
