@@ -2,7 +2,8 @@
 
 Plugin TurboHUD pour Diablo III — Historique des Greater Rifts avec timer en temps réel.
 
-![Aperçu](https://i.imgur.com/placeholder.png)
+<img width="480" height="311" alt="image" src="https://github.com/user-attachments/assets/6a595bfd-943e-4d79-be99-c75bdb1f43f8" />
+
 
 ## Fonctionnalités
 
