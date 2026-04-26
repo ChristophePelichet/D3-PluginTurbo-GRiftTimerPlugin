@@ -85,7 +85,7 @@ Optional columns are ordered — each one appears **to the right of the previous
 
 | Order | Property | Width constant | Default | Config key | Content |
 |---|---|---|---|---|---|
-| 1st | `COL_DEATH` | `WIN_W_DEATH = 55f` | hidden | `show_deaths=yes\|no` | Death count + time lost: `0`, `1 (+5s)`, `2 (+15s)`, `4 (+50s)`, `5 (+1:20)` … Header: `†`. Green if 0, red if > 0. |
+| 1st | `COL_DEATH` | `WIN_W_DEATH = 88f` | hidden | `show_deaths=yes\|no` | Death count + time lost: `0`, `1 (+5s)`, `2 (+15s)`, `4 (+50s)`, `5 (+1:20)` … Header: `†`. Green if 0, red if > 0. |
 | 2nd | `COL_FLOOR` | `WIN_W_FLOOR = 60f` | hidden | `show_floors=yes\|no` | Floor count for the run: `3F`, `4F`, … |
 | 3rd | `COL_PYLON` | `WIN_W_PYLON = 180f` | hidden | `show_pylons=yes\|no` | Space-separated pylon abbreviations: `Ch Co Po Sh Spd` |
 

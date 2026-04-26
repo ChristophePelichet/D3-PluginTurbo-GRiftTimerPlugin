@@ -28,7 +28,7 @@ namespace Turbo.Plugins.Default
 
         // ── Layout ────────────────────────────────────────────────────────────
         private const float WIN_W_BASE  = 362f; // width without optional columns
-        private const float WIN_W_DEATH  = 55f;   // extra width when deaths column is visible
+        private const float WIN_W_DEATH  = 88f;   // extra width when deaths column is visible
         private const float WIN_W_FLOOR  = 60f;   // extra width when floor column is visible
         private const float WIN_W_PYLON  = 180f;  // extra width when pylons column is visible
         private const float HDR_H    = 32f;

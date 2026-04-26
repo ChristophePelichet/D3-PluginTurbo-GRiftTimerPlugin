@@ -82,5 +82,5 @@ On load, falls back to `0` if the field is absent (backward compatibility with o
 | `RiftRun.DeathCount` | Stored death count per completed run |
 | `DeathTimeLostSeconds(int deaths)` | Returns cumulative penalty in seconds |
 | `FormatDeathCell(int deaths)` | Returns display string: `"0"` or `"N (+Xs)"` / `"N (+M:SS)"` |
-| `WIN_W_DEATH` | Column width constant (`55f`) |
+| `WIN_W_DEATH` | Column width constant (`88f`) |
 | `COL_DEATH` | X position of the column (`WIN_W_BASE`) |
