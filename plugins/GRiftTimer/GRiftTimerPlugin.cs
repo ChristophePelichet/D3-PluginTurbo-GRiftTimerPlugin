@@ -63,6 +63,7 @@ namespace Turbo.Plugins.Default
         private int    _currentGRLevel = 0;
         private double _lastElapsed    = 0.0;
         private float  _lastPercent    = 0f;
+        private float  _maxPercent     = 0f;   // max RiftPercentage seen this run (latches at peak)
         private int    _runNumber      = 0;
 
         // ── Hover button state ────────────────────────────────────────────────
@@ -258,6 +259,7 @@ namespace Turbo.Plugins.Default
 
             LoadConfig();
             LoadHistory();
+            EnsureCsvExists();
             InitCfgWatcher();
         }
 
@@ -304,8 +306,9 @@ namespace Turbo.Plugins.Default
             _history.Clear();
             _runNumber = 0;
             _lastCommittedStartTick = 0;
-            _startTick   = 0;
-            _pendingSave = false;
+            _startTick      = 0;
+            _pendingSave    = false;
+            _maxPercent     = 0f;
             try
             {
                 if (File.Exists(_historyFile))
@@ -324,6 +327,7 @@ namespace Turbo.Plugins.Default
                 }
             }
             catch { }
+            EnsureCsvExists();
             SaveConfig();
         }
 
@@ -382,6 +386,7 @@ namespace Turbo.Plugins.Default
                         _runNumber++;
                         _lastElapsed    = 0.0;
                         _lastPercent    = 0f;
+                        _maxPercent     = 0f;
                         _pendingSave    = false;
                         _currentPylonList.Clear();
                         _seenPylonIds.Clear();
@@ -398,14 +403,13 @@ namespace Turbo.Plugins.Default
                 _leaveTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             }
 
-            // Grace delay expired without re-entering → this is a true rift end
-            // Completed rift (boss killed): 3s grace is enough
-            // Abandoned rift / floor change: full grace (default 60s)
+            // Grace delay expired without re-entering → this is a true rift end.
+            // Here IsInGame=true and nowInGR=false: player is in town/act, floor changes
+            // always go through a loading screen (IsInGame=false), so 3s is enough.
             if (_pendingSave && !nowInGR)
             {
                 long now   = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                long grace = _lastPercent >= 100f ? 3000L : _floorGraceMs;
-                if (now - _leaveTimeMs > grace)
+                if (now - _leaveTimeMs > 3000L)
                     CommitRun();
             }
 
@@ -424,6 +428,7 @@ namespace Turbo.Plugins.Default
                     _lastElapsed = Math.Min((Hud.Game.CurrentGameTick - _startTick) / 60.0, 900.0);
 
                 _lastPercent = (float)Hud.Game.RiftPercentage;
+                if (_lastPercent > _maxPercent) _maxPercent = _lastPercent;
 
                 // Update texture cache for pylons still visible (not yet activated)
                 foreach (var marker in Hud.Game.Markers)
@@ -571,7 +576,7 @@ namespace Turbo.Plugins.Default
                 Number         = _runNumber,
                 GRLevel        = _currentGRLevel,
                 ElapsedSeconds = _lastElapsed,
-                Completed      = _lastPercent >= 100f,
+                Completed      = _maxPercent >= 99f,
                 Pylons         = new List<PylonRecord>(_currentPylonList)
             };
             _history.Insert(0, run);
@@ -772,7 +777,7 @@ namespace Turbo.Plugins.Default
 
             if (_debugLog.Count == 0)
             {
-                float dbgH = HDR_H + DEBUG_ROW_H * 2 + PAD;
+                float dbgH = HDR_H + DEBUG_ROW_H + PAD;
                 _bgBrush.DrawRectangle(dbgX2, dbgY2, DEBUG_WIN_W, dbgH);
                 _borderBrush.DrawRectangle(dbgX2, dbgY2, DEBUG_WIN_W, dbgH);
                 _hdrBrush.DrawRectangle(dbgX2, dbgY2, DEBUG_WIN_W, HDR_H);
@@ -780,11 +785,6 @@ namespace Turbo.Plugins.Default
                 _hdrFont.DrawText(tl0, dbgX2 + PAD, dbgY2 + (HDR_H - tl0.Metrics.Height) / 2f);
                 _hdrBorderBrush.DrawRectangle(dbgX2, dbgY2 + HDR_H - 1, DEBUG_WIN_W, 1);
                 DrawHoverBtn("[X]", dbgX2 + DEBUG_WIN_W - PAD - BTN_W, dbgY2 + (HDR_H - BTN_H) / 2f, 4);
-                string diagLine = "cx=" + Hud.Window.CursorX + " cy=" + Hud.Window.CursorY
-                    + "  winX=" + (int)_winX + " winY=" + (int)_winY
-                    + "  drag=" + _dragging;
-                var tlDiag = _normFont.GetTextLayout(diagLine);
-                _normFont.DrawText(tlDiag, dbgX2 + PAD, dbgY2 + HDR_H + (DEBUG_ROW_H - tlDiag.Metrics.Height) / 2f);
                 return;
             }
 
@@ -800,7 +800,6 @@ namespace Turbo.Plugins.Default
             _hdrFont.DrawText(tlHdr, dbgX2 + PAD, dbgY2 + (HDR_H - tlHdr.Metrics.Height) / 2f);
             _hdrBorderBrush.DrawRectangle(dbgX2, dbgY2 + HDR_H - 1, DEBUG_WIN_W, 1);
             DrawHoverBtn("[X]", dbgX2 + DEBUG_WIN_W - PAD - BTN_W, dbgY2 + (HDR_H - BTN_H) / 2f, 4);
-
             // Diagnostic row: cursor + window position + drag state
             string diag = "cx=" + Hud.Window.CursorX + " cy=" + Hud.Window.CursorY
                 + "  winX=" + (int)_winX + " winY=" + (int)_winY
@@ -1204,6 +1203,16 @@ namespace Turbo.Plugins.Default
                 case "Sp":  result = ShrineType.SpeedPylon;      return true;
                 default:    result = ShrineType.BlessedShrine;   return false;
             }
+        }
+
+        private void EnsureCsvExists()
+        {
+            try
+            {
+                if (!File.Exists(_historyFile))
+                    File.WriteAllText(_historyFile, string.Empty);
+            }
+            catch { }
         }
 
         private void AppendToHistory(RiftRun run)
