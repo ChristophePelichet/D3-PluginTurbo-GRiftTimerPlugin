@@ -27,7 +27,7 @@ namespace Turbo.Plugins.Default
         public bool Visible { get; set; } = true;
 
         // ── Layout ────────────────────────────────────────────────────────────
-        private const float WIN_W_BASE  = 390f; // width without optional columns
+        private const float WIN_W_BASE  = 362f; // width without optional columns
         private const float WIN_W_FLOOR  = 60f;   // extra width when floor column is visible
         private const float WIN_W_PYLON  = 180f;  // extra width when pylons column is visible
         private const float HDR_H    = 32f;
@@ -191,7 +191,7 @@ namespace Turbo.Plugins.Default
                         case "title":      return "Historique GR";
                         case "col_time":   return "Temps";
                         case "col_result": return "Resultat";
-                        case "col_floors": return "Étages";
+                                case "col_floors": return "Étages";
                         case "col_pylons": return "Pylônes";
                         case "killed":     return "✓ Tue";
                         case "timeout":    return "✗ Timeout";

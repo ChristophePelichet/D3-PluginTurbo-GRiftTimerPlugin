@@ -36,7 +36,7 @@ Vertical stacking formula:
 
 | Constant | Value | Description |
 |---|---|---|
-| `WIN_W_BASE` | `390f` | Fixed width of the window (core columns only, no optional columns). **Never shrink below `~370f`** — the header title + 3 buttons must all fit. |
+| `WIN_W_BASE` | `362f` | Fixed width of the window (core columns only, no optional columns). **Never shrink below `~340f`** — the header title + buttons must fit and `COL_RES + content_width` must not overflow. Note: the header average text requires `WIN_W >= 370f`; with at least one optional column active this is always satisfied. |
 | `WIN_W` (property) | computed | `WIN_W_BASE + optional widths`. Use this everywhere in rendering code. |
 | `HDR_H` | `32f` | Header row height — title + buttons. Increase for more air around the title. |
 | `COL_H` | `28f` | Column header row height (#, GR, Time, Result). |
@@ -55,10 +55,10 @@ These columns are **constants** — they do not change based on config options.
 | `COL_NUM` | `8f` (= PAD) | Run number `#23` | 52px to `COL_GR` |
 | `COL_GR` | `60f` | GR level `GR119` | 70px to `COL_TIME` |
 | `COL_TIME` | `130f` | Elapsed time `01:08:500` | 125px to `COL_RES` |
-| `COL_RES` | `255f` | Result `✓ Killed` / `✗ Timeout` | 135px to end of `WIN_W_BASE` |
+| `COL_RES` | `255f` | Result `✓ Killed` / `✗ Timeout` | 105px to end of `WIN_W_BASE` |
 
 **Rule:** If you change `COL_GR`, shift `COL_TIME` by the same delta.  
-**Rule:** `COL_RES + content_width` must stay below `WIN_W_BASE` (390px).
+**Rule:** `COL_RES + content_width` must stay below `WIN_W_BASE` (362px). Longest result text `"✗ Timeout"` ≈ 80px → ends at ~335px, leaving ~27px margin.
 
 ---
 
@@ -81,9 +81,12 @@ WIN_W => WIN_W_BASE + (_showA ? WIN_W_A : 0f) + (_showB ? WIN_W_B : 0f) + ...
 
 ### Current optional columns
 
-| Property | Width constant | Default | Config key | Content |
-|---|---|---|---|---|
-| `COL_PYLON` | `WIN_W_PYLON = 180f` | hidden | `show_pylons=yes\|no` | Space-separated pylon abbreviations: `Ch Co Po Sh Spd` |
+Optional columns are ordered — each one appears **to the right of the previous**. Order in code = order in the formula.
+
+| Order | Property | Width constant | Default | Config key | Content |
+|---|---|---|---|---|---|
+| 1st | `COL_FLOOR` | `WIN_W_FLOOR = 60f` | hidden | `show_floors=yes\|no` | Floor count for the run: `3F`, `4F`, … |
+| 2nd | `COL_PYLON` | `WIN_W_PYLON = 180f` | hidden | `show_pylons=yes\|no` | Space-separated pylon abbreviations: `Ch Co Po Sh Spd` |
 
 ### Pylon abbreviations
 
@@ -114,7 +117,7 @@ The header contains (left to right):
 | `HOVER_MS` | `1500ms` — hold duration to trigger a button action |
 
 **Rule:** The average text is only drawn if `availW >= textWidth + 4f`. If `WIN_W_BASE` is ever reduced, the average text may disappear before the layout breaks.  
-**Minimum safe `WIN_W_BASE`:** title (~130px) + 2×PAD + avg (~130px) + PAD + 3×BTN_W + 2×BTN_GAP + PAD ≈ 370px.
+**Minimum safe `WIN_W_BASE`:** title (~130px) + 2×PAD + avg (~130px) + PAD + 3×BTN_W + 2×BTN_GAP + PAD ≈ 370px. Current value is 360px — intentionally below this threshold; the header average text is hidden when no optional column is active, but visible whenever `_showFloor` or `_showPylons` is on (`WIN_W ≥ 420px`).
 
 ---
 
@@ -122,14 +125,14 @@ The header contains (left to right):
 
 1. Add width constant: `private const float WIN_W_NEW = Xf;`
 2. Add visibility field: `private bool _showNew = false;`
-3. Add position property (after all preceding optional columns):
+3. Add position property **after all currently active optional columns** (currently `COL_FLOOR` then `COL_PYLON`):
    ```csharp
-   private float COL_NEW => WIN_W_BASE + (_showPylons ? WIN_W_PYLON : 0f);
+   private float COL_NEW => WIN_W_BASE + (_showFloor ? WIN_W_FLOOR : 0f) + (_showPylons ? WIN_W_PYLON : 0f);
    ```
-4. Extend `WIN_W`:
+4. Extend `WIN_W` with the new term at the end:
    ```csharp
-   private float WIN_W => WIN_W_BASE + (_showPylons ? WIN_W_PYLON : 0f) + (_showNew ? WIN_W_NEW : 0f);
+   private float WIN_W => WIN_W_BASE + (_showFloor ? WIN_W_FLOOR : 0f) + (_showPylons ? WIN_W_PYLON : 0f) + (_showNew ? WIN_W_NEW : 0f);
    ```
-5. Add config key in `LoadConfig` / `SaveConfig` / `SaveConfig` comments.
+5. Add config key in `LoadConfig` / `SaveConfig`.
 6. Draw the column in `PaintTopInGame` and `DrawTimerBarRow` guarded by `if (_showNew)`.
 7. Draw the column header in the column headers block guarded by `if (_showNew)`.
