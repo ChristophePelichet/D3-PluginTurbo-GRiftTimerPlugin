@@ -85,8 +85,9 @@ Optional columns are ordered — each one appears **to the right of the previous
 
 | Order | Property | Width constant | Default | Config key | Content |
 |---|---|---|---|---|---|
-| 1st | `COL_FLOOR` | `WIN_W_FLOOR = 60f` | hidden | `show_floors=yes\|no` | Floor count for the run: `3F`, `4F`, … |
-| 2nd | `COL_PYLON` | `WIN_W_PYLON = 180f` | hidden | `show_pylons=yes\|no` | Space-separated pylon abbreviations: `Ch Co Po Sh Spd` |
+| 1st | `COL_DEATH` | `WIN_W_DEATH = 55f` | hidden | `show_deaths=yes\|no` | Death count + time lost: `0`, `1 (+5s)`, `2 (+15s)`, `4 (+50s)`, `5 (+1:20)` … Header: `†`. Green if 0, red if > 0. |
+| 2nd | `COL_FLOOR` | `WIN_W_FLOOR = 60f` | hidden | `show_floors=yes\|no` | Floor count for the run: `3F`, `4F`, … |
+| 3rd | `COL_PYLON` | `WIN_W_PYLON = 180f` | hidden | `show_pylons=yes\|no` | Space-separated pylon abbreviations: `Ch Co Po Sh Spd` |
 
 ### Pylon abbreviations
 
@@ -125,13 +126,13 @@ The header contains (left to right):
 
 1. Add width constant: `private const float WIN_W_NEW = Xf;`
 2. Add visibility field: `private bool _showNew = false;`
-3. Add position property **after all currently active optional columns** (currently `COL_FLOOR` then `COL_PYLON`):
+3. Add position property **after all currently active optional columns** (currently `COL_DEATH`, `COL_FLOOR`, then `COL_PYLON`):
    ```csharp
-   private float COL_NEW => WIN_W_BASE + (_showFloor ? WIN_W_FLOOR : 0f) + (_showPylons ? WIN_W_PYLON : 0f);
+   private float COL_NEW => WIN_W_BASE + (_showDeaths ? WIN_W_DEATH : 0f) + (_showFloor ? WIN_W_FLOOR : 0f) + (_showPylons ? WIN_W_PYLON : 0f);
    ```
 4. Extend `WIN_W` with the new term at the end:
    ```csharp
-   private float WIN_W => WIN_W_BASE + (_showFloor ? WIN_W_FLOOR : 0f) + (_showPylons ? WIN_W_PYLON : 0f) + (_showNew ? WIN_W_NEW : 0f);
+   private float WIN_W => WIN_W_BASE + (_showDeaths ? WIN_W_DEATH : 0f) + (_showFloor ? WIN_W_FLOOR : 0f) + (_showPylons ? WIN_W_PYLON : 0f) + (_showNew ? WIN_W_NEW : 0f);
    ```
 5. Add config key in `LoadConfig` / `SaveConfig`.
 6. Draw the column in `PaintTopInGame` and `DrawTimerBarRow` guarded by `if (_showNew)`.

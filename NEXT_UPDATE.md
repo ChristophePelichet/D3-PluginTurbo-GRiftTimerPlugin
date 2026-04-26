@@ -1,23 +1,19 @@
 # Next Update — Features to Implement
 
-## 1. Death count in GR (branch: feat/death-count)
+## ~~1. Death count in GR~~ ✅ Done (merged in feat/death-count)
 
-Track and display the number of times the player died during a GR run.
+~~Track and display the number of times the player died during a GR run.~~
 
-**API available:**
-- `Hud.Game.Me.IsDead` — live death state
-- `Hud.Game.Me.LastDied` — timestamp of last death (IWatch)
-- `Hud.Sno.Attributes.Tiered_Loot_Run_Death_Count` — in-game GR death counter attribute
-
-**Plan:**
-- Add `int _deathCount` to `RiftRun`
-- Track deaths in `AfterCollect()` using `IsDead` edge detection (false→true transition)
-- Display in a new column or as part of the Result column (e.g. `✓ Killed  0†`)
-- Persist in CSV (add 6th field)
+Implemented:
+- `†` column (55 px), toggleable via `show_deaths=yes|no`
+- Rising-edge detection on `Hud.Game.Me.IsDead`
+- Display format `N (+Xs)` / `N (+M:SS)` with cumulative penalty
+- CSV field 7, backward-compatible
+- See `documentation/deaths_module.md`
 
 ---
 
-## 2. Rift Guardian name (branch: to be created)
+## 1. Rift Guardian name (branch: to be created)
 
 Capture and display the name of the rift guardian (final boss) for each run.
 
@@ -30,4 +26,4 @@ Capture and display the name of the rift guardian (final boss) for each run.
 - Add `string GuardianName` to `RiftRun`
 - Capture name in `AfterCollect()` when a `MonsterPriority.boss` monster is detected in GR
 - Display in the Result column or as a tooltip/extra column
-- Persist in CSV (add 7th field)
+- Persist in CSV (add 8th field)
