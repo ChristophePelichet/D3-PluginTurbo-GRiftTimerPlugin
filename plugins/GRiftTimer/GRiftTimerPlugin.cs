@@ -28,6 +28,7 @@ namespace Turbo.Plugins.Default
 
         // ── Layout ────────────────────────────────────────────────────────────
         private const float WIN_W_BASE  = 362f; // width without optional columns
+        private const float WIN_W_DEATH  = 55f;   // extra width when deaths column is visible
         private const float WIN_W_FLOOR  = 60f;   // extra width when floor column is visible
         private const float WIN_W_PYLON  = 180f;  // extra width when pylons column is visible
         private const float HDR_H    = 32f;
@@ -42,12 +43,12 @@ namespace Turbo.Plugins.Default
 
         // Optional columns — each is a computed property so adding/removing columns is automatic
         // Formula: WIN_W_BASE + sum of all preceding optional column widths that are active
-        private float COL_FLOOR => WIN_W_BASE;                                         // 1st optional column
-        private float COL_PYLON => WIN_W_BASE + (_showFloor ? WIN_W_FLOOR : 0f);       // 2nd optional column
-        // Future: private float COL_XYZ => WIN_W_BASE + (_showFloor ? WIN_W_FLOOR : 0f) + (_showPylons ? WIN_W_PYLON : 0f);
+        private float COL_DEATH => WIN_W_BASE;                                                                                         // 1st optional column
+        private float COL_FLOOR => WIN_W_BASE + (_showDeaths ? WIN_W_DEATH : 0f);                                                      // 2nd optional column
+        private float COL_PYLON => WIN_W_BASE + (_showDeaths ? WIN_W_DEATH : 0f) + (_showFloor ? WIN_W_FLOOR : 0f);                    // 3rd optional column
+        // Future: private float COL_XYZ => WIN_W_BASE + (_showDeaths ? WIN_W_DEATH : 0f) + (_showFloor ? WIN_W_FLOOR : 0f) + (_showPylons ? WIN_W_PYLON : 0f);
 
-        private float WIN_W => WIN_W_BASE + (_showFloor ? WIN_W_FLOOR : 0f) + (_showPylons ? WIN_W_PYLON : 0f);
-        // Future: + (_showXyz ? WIN_W_XYZ : 0f)
+        private float WIN_W => WIN_W_BASE + (_showDeaths ? WIN_W_DEATH : 0f) + (_showFloor ? WIN_W_FLOOR : 0f) + (_showPylons ? WIN_W_PYLON : 0f);
 
         private const float BAR_ROW_H = 26f;  // height of the combined timer bar row
 
@@ -67,6 +68,8 @@ namespace Turbo.Plugins.Default
         private float  _lastPercent    = 0f;
         private float  _maxPercent     = 0f;   // max RiftPercentage seen this run (latches at peak)
         private int    _currentFloor   = 1;    // floor counter for current run (incremented on each floor change)
+        private int    _currentDeaths  = 0;    // death counter for current run
+        private bool   _prevMeDead     = false; // previous IsDead state (rising-edge detection)
         private int    _runNumber      = 0;
 
         // ── Hover button state ────────────────────────────────────────────────
@@ -97,6 +100,7 @@ namespace Turbo.Plugins.Default
         private double _threshRedSec    = 100.0;  // orange below, red above (default 1:40)
 
         // ── Column visibility ─────────────────────────────────────────────
+        private bool _showDeaths = false;
         private bool _showFloor  = false;
         private bool _showPylons = false;
         private bool _showStats  = true;
@@ -130,6 +134,7 @@ namespace Turbo.Plugins.Default
             public double           ElapsedSeconds;
             public bool             Completed;
             public int              FloorCount;   // number of floors visited (1 = single floor)
+            public int              DeathCount;   // total deaths during this run
             public List<PylonRecord> Pylons = new List<PylonRecord>();
         }
 
@@ -191,7 +196,8 @@ namespace Turbo.Plugins.Default
                         case "title":      return "Historique GR";
                         case "col_time":   return "Temps";
                         case "col_result": return "Resultat";
-                                case "col_floors": return "Étages";
+                        case "col_deaths": return "†";
+                        case "col_floors": return "Étages";
                         case "col_pylons": return "Pylônes";
                         case "killed":     return "✓ Tue";
                         case "timeout":    return "✗ Timeout";
@@ -206,6 +212,7 @@ namespace Turbo.Plugins.Default
                 case "title":      return "GR Timer History";
                 case "col_time":   return "Time";
                 case "col_result": return "Result";
+                case "col_deaths": return "†";
                 case "col_floors": return "Floors";
                 case "col_pylons": return "Pylons";
                 case "killed":     return "✓ Killed";
@@ -317,6 +324,8 @@ namespace Turbo.Plugins.Default
             _pendingSave    = false;
             _maxPercent     = 0f;
             _currentFloor   = 1;
+            _currentDeaths  = 0;
+            _prevMeDead     = false;
             try
             {
                 if (File.Exists(_historyFile))
@@ -397,6 +406,8 @@ namespace Turbo.Plugins.Default
                         _lastPercent    = 0f;
                         _maxPercent     = 0f;
                         _currentFloor   = 1;
+                        _currentDeaths  = 0;
+                        _prevMeDead     = false;
                         _pendingSave    = false;
                         _currentPylonList.Clear();
                         _seenPylonIds.Clear();
@@ -411,6 +422,7 @@ namespace Turbo.Plugins.Default
             {
                 _pendingSave = true;
                 _leaveTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                _prevMeDead  = false;
             }
 
             // Grace delay expired without re-entering → this is a true rift end.
@@ -439,6 +451,15 @@ namespace Turbo.Plugins.Default
 
                 _lastPercent = (float)Hud.Game.RiftPercentage;
                 if (_lastPercent > _maxPercent) _maxPercent = _lastPercent;
+
+                // Track player deaths (rising edge on IsDead)
+                var me = Hud.Game.Me;
+                if (me != null)
+                {
+                    bool isDead = me.IsDead;
+                    if (isDead && !_prevMeDead) _currentDeaths++;
+                    _prevMeDead = isDead;
+                }
 
                 // Update texture cache for pylons still visible (not yet activated)
                 foreach (var marker in Hud.Game.Markers)
@@ -588,6 +609,7 @@ namespace Turbo.Plugins.Default
                 ElapsedSeconds = _lastElapsed,
                 Completed      = _maxPercent >= 99f,
                 FloorCount     = _currentFloor,
+                DeathCount     = _currentDeaths,
                 Pylons         = new List<PylonRecord>(_currentPylonList)
             };
             _history.Insert(0, run);
@@ -655,6 +677,8 @@ namespace Turbo.Plugins.Default
             float chy = _winY + HDR_H;
             DrawColRow(chy, "#", "GR", L("col_time"), L("col_result"),
                 _colFont, _colFont, _colFont, _colFont, COL_H);
+            if (_showDeaths)
+                DrawCell(_colFont, L("col_deaths"), _winX + COL_DEATH, chy, COL_H);
             if (_showFloor)
                 DrawCell(_colFont, L("col_floors"), _winX + COL_FLOOR, chy, COL_H);
             if (_showPylons)
@@ -700,6 +724,11 @@ namespace Turbo.Plugins.Default
                         FormatTime(run.ElapsedSeconds),
                         run.Completed ? L("killed") : L("timeout"),
                         _rowFont, _rowFont, tf, rf, ROW_H);
+                    if (_showDeaths)
+                    {
+                        IFont df = run.DeathCount == 0 ? _goodFont : _badFont;
+                        DrawCell(df, FormatDeathCell(run.DeathCount), _winX + COL_DEATH, ry, ROW_H);
+                    }
                     if (_showFloor)
                         DrawCell(_normFont, run.FloorCount + "F", _winX + COL_FLOOR, ry, ROW_H);
                     if (_showPylons && pylonsStr.Length > 0)
@@ -882,6 +911,8 @@ namespace Turbo.Plugins.Default
             f.DrawText(tlGr,    _winX + COL_GR,   cy);
             ft.DrawText(tlTime, _winX + COL_TIME,  cy);
             f.DrawText(tlRes,   _winX + COL_RES,   cy);
+            if (!idle && _showDeaths)
+                DrawCell(_normFont, FormatDeathCell(_currentDeaths), _winX + COL_DEATH, cy, BAR_ROW_H);
             if (!idle && _showFloor)
                 DrawCell(_normFont, _currentFloor + "F", _winX + COL_FLOOR, cy, BAR_ROW_H);
             if (!idle && _showPylons && _currentPylonList.Count > 0)
@@ -1044,6 +1075,27 @@ namespace Turbo.Plugins.Default
             return string.Format("{0:D2}:{1:D2}:{2:D3}", min, sec, ms);
         }
 
+        // Returns the cumulative death-penalty time lost in seconds.
+        // Penalty: 5s / 10s / 15s / 20s per death 1-4, then 30s each from death 5 onward.
+        private static int DeathTimeLostSeconds(int deaths)
+        {
+            int total = 0;
+            for (int i = 1; i <= deaths; i++)
+                total += i <= 4 ? i * 5 : 30;
+            return total;
+        }
+
+        // Formats the Deaths cell: "0" when no deaths, "N (+Xs)" or "N (+M:SS)" otherwise.
+        private static string FormatDeathCell(int deaths)
+        {
+            if (deaths == 0) return "0";
+            int lost    = DeathTimeLostSeconds(deaths);
+            string time = lost >= 60
+                ? string.Format("{0}:{1:D2}", lost / 60, lost % 60)
+                : lost + "s";
+            return string.Format("{0} (+{1})", deaths, time);
+        }
+
         private int GetGRLevel()
         {
             return (int)Hud.Game.Me.InGreaterRiftRank;
@@ -1077,6 +1129,7 @@ namespace Turbo.Plugins.Default
                         case "reset_action":   if (val == "archive" || val == "delete") _resetAction = val; break;
                         case "show_pylons":    _showPylons = val.ToLowerInvariant() != "no"; break;
                         case "show_floors":    _showFloor  = val.ToLowerInvariant() == "yes"; break;
+                        case "show_deaths":    _showDeaths = val.ToLowerInvariant() == "yes"; break;
                         case "show_stats":     _showStats  = val.ToLowerInvariant() != "no"; break;
                         case "debug":          _debugEnabled = val.ToLowerInvariant() == "yes"; break;
                         case "debug_vars":     _debugVars = val.Trim(); break;
@@ -1108,6 +1161,7 @@ namespace Turbo.Plugins.Default
                     "#               delete  = permanently delete",
                     "# show_pylons   : show the Pylons column  yes | no",
                     "# show_floors   : show the Floors column  yes | no",
+                    "# show_deaths   : show the Deaths column  yes | no",
                     "# show_stats    : show the stats box below history  yes | no",
                     "# debug         : show debug window  yes | no",
                     "# debug_vars    : variables to watch  pylons | shrines | markers | rift_state",
@@ -1121,6 +1175,7 @@ namespace Turbo.Plugins.Default
                     "reset_action="  + _resetAction,
                     "show_pylons="   + (_showPylons ? "yes" : "no"),
                     "show_floors="   + (_showFloor  ? "yes" : "no"),
+                    "show_deaths="   + (_showDeaths ? "yes" : "no"),
                     "show_stats="    + (_showStats  ? "yes" : "no"),
                     "debug="         + (_debugEnabled ? "yes" : "no"),
                     "debug_vars="    + _debugVars,
@@ -1174,7 +1229,8 @@ namespace Turbo.Plugins.Default
                         }
                     }
                     _history.Add(new RiftRun { Number = num, GRLevel = lvl, ElapsedSeconds = sec, Completed = ok, Pylons = pylons,
-                        FloorCount = (p.Length >= 6 && int.TryParse(p[5].Trim(), out int fc) ? fc : 1) });
+                        FloorCount  = (p.Length >= 6 && int.TryParse(p[5].Trim(), out int fc) ? fc : 1),
+                        DeathCount  = (p.Length >= 7 && int.TryParse(p[6].Trim(), out int dc) ? dc : 0) });
                 }
 
                 if (_history.Count > 0)
@@ -1246,8 +1302,8 @@ namespace Turbo.Plugins.Default
                     ? string.Join("|", run.Pylons.Select(p => p.TextureSno + ":" + p.TextureFrame + ":" + PylonCsvKey(p.Type)))
                     : "";
                 var line = string.Format(CultureInfo.InvariantCulture,
-                    "{0},{1},{2:F1},{3},{4},{5}",
-                    run.Number, run.GRLevel, run.ElapsedSeconds, run.Completed ? "1" : "0", pylonsCsv, run.FloorCount);
+                    "{0},{1},{2:F1},{3},{4},{5},{6}",
+                    run.Number, run.GRLevel, run.ElapsedSeconds, run.Completed ? "1" : "0", pylonsCsv, run.FloorCount, run.DeathCount);
                 File.AppendAllText(_historyFile, line + Environment.NewLine);
             }
             catch { }
