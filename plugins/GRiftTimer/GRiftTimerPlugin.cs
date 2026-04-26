@@ -27,7 +27,8 @@ namespace Turbo.Plugins.Default
         public bool Visible { get; set; } = true;
 
         // ── Layout ────────────────────────────────────────────────────────────
-        private const float WIN_W_BASE  = 390f; // width without optional columns
+        private const float WIN_W_BASE  = 362f; // width without optional columns
+        private const float WIN_W_FLOOR  = 60f;   // extra width when floor column is visible
         private const float WIN_W_PYLON  = 180f;  // extra width when pylons column is visible
         private const float HDR_H    = 32f;
         private const float COL_H    = 28f;
@@ -41,10 +42,11 @@ namespace Turbo.Plugins.Default
 
         // Optional columns — each is a computed property so adding/removing columns is automatic
         // Formula: WIN_W_BASE + sum of all preceding optional column widths that are active
-        private float COL_PYLON => WIN_W_BASE; // 1st optional column, always starts at WIN_W_BASE
-        // Future: private float COL_XYZ => WIN_W_BASE + (_showPylons ? WIN_W_PYLON : 0f);
+        private float COL_FLOOR => WIN_W_BASE;                                         // 1st optional column
+        private float COL_PYLON => WIN_W_BASE + (_showFloor ? WIN_W_FLOOR : 0f);       // 2nd optional column
+        // Future: private float COL_XYZ => WIN_W_BASE + (_showFloor ? WIN_W_FLOOR : 0f) + (_showPylons ? WIN_W_PYLON : 0f);
 
-        private float WIN_W => WIN_W_BASE + (_showPylons ? WIN_W_PYLON : 0f);
+        private float WIN_W => WIN_W_BASE + (_showFloor ? WIN_W_FLOOR : 0f) + (_showPylons ? WIN_W_PYLON : 0f);
         // Future: + (_showXyz ? WIN_W_XYZ : 0f)
 
         private const float BAR_ROW_H = 26f;  // height of the combined timer bar row
@@ -64,6 +66,7 @@ namespace Turbo.Plugins.Default
         private double _lastElapsed    = 0.0;
         private float  _lastPercent    = 0f;
         private float  _maxPercent     = 0f;   // max RiftPercentage seen this run (latches at peak)
+        private int    _currentFloor   = 1;    // floor counter for current run (incremented on each floor change)
         private int    _runNumber      = 0;
 
         // ── Hover button state ────────────────────────────────────────────────
@@ -94,6 +97,7 @@ namespace Turbo.Plugins.Default
         private double _threshRedSec    = 100.0;  // orange below, red above (default 1:40)
 
         // ── Column visibility ─────────────────────────────────────────────
+        private bool _showFloor  = false;
         private bool _showPylons = false;
         private bool _showStats  = true;
 
@@ -125,6 +129,7 @@ namespace Turbo.Plugins.Default
             public int              GRLevel;
             public double           ElapsedSeconds;
             public bool             Completed;
+            public int              FloorCount;   // number of floors visited (1 = single floor)
             public List<PylonRecord> Pylons = new List<PylonRecord>();
         }
 
@@ -186,6 +191,7 @@ namespace Turbo.Plugins.Default
                         case "title":      return "Historique GR";
                         case "col_time":   return "Temps";
                         case "col_result": return "Resultat";
+                                case "col_floors": return "Étages";
                         case "col_pylons": return "Pylônes";
                         case "killed":     return "✓ Tue";
                         case "timeout":    return "✗ Timeout";
@@ -200,6 +206,7 @@ namespace Turbo.Plugins.Default
                 case "title":      return "GR Timer History";
                 case "col_time":   return "Time";
                 case "col_result": return "Result";
+                case "col_floors": return "Floors";
                 case "col_pylons": return "Pylons";
                 case "killed":     return "✓ Killed";
                 case "timeout":    return "✗ Timeout";
@@ -309,6 +316,7 @@ namespace Turbo.Plugins.Default
             _startTick      = 0;
             _pendingSave    = false;
             _maxPercent     = 0f;
+            _currentFloor   = 1;
             try
             {
                 if (File.Exists(_historyFile))
@@ -376,6 +384,7 @@ namespace Turbo.Plugins.Default
                         // Floor change or re-entry on the same run → continue
                         // DO NOT overwrite _startTick: keep the tick from floor 1
                         // so the timer keeps accumulating correctly
+                        if (isFloorChange) _currentFloor++;
                         _pendingSave = false;
                     }
                     else
@@ -387,6 +396,7 @@ namespace Turbo.Plugins.Default
                         _lastElapsed    = 0.0;
                         _lastPercent    = 0f;
                         _maxPercent     = 0f;
+                        _currentFloor   = 1;
                         _pendingSave    = false;
                         _currentPylonList.Clear();
                         _seenPylonIds.Clear();
@@ -577,6 +587,7 @@ namespace Turbo.Plugins.Default
                 GRLevel        = _currentGRLevel,
                 ElapsedSeconds = _lastElapsed,
                 Completed      = _maxPercent >= 99f,
+                FloorCount     = _currentFloor,
                 Pylons         = new List<PylonRecord>(_currentPylonList)
             };
             _history.Insert(0, run);
@@ -644,6 +655,8 @@ namespace Turbo.Plugins.Default
             float chy = _winY + HDR_H;
             DrawColRow(chy, "#", "GR", L("col_time"), L("col_result"),
                 _colFont, _colFont, _colFont, _colFont, COL_H);
+            if (_showFloor)
+                DrawCell(_colFont, L("col_floors"), _winX + COL_FLOOR, chy, COL_H);
             if (_showPylons)
                 DrawCell(_colFont, L("col_pylons"), _winX + COL_PYLON, chy, COL_H);
             _sepBrush.DrawRectangle(_winX, chy + COL_H - 1, WIN_W, 1);
@@ -687,6 +700,8 @@ namespace Turbo.Plugins.Default
                         FormatTime(run.ElapsedSeconds),
                         run.Completed ? L("killed") : L("timeout"),
                         _rowFont, _rowFont, tf, rf, ROW_H);
+                    if (_showFloor)
+                        DrawCell(_normFont, run.FloorCount + "F", _winX + COL_FLOOR, ry, ROW_H);
                     if (_showPylons && pylonsStr.Length > 0)
                         DrawCell(_normFont, pylonsStr, _winX + COL_PYLON, ry, ROW_H);
 
@@ -867,6 +882,8 @@ namespace Turbo.Plugins.Default
             f.DrawText(tlGr,    _winX + COL_GR,   cy);
             ft.DrawText(tlTime, _winX + COL_TIME,  cy);
             f.DrawText(tlRes,   _winX + COL_RES,   cy);
+            if (!idle && _showFloor)
+                DrawCell(_normFont, _currentFloor + "F", _winX + COL_FLOOR, cy, BAR_ROW_H);
             if (!idle && _showPylons && _currentPylonList.Count > 0)
             {
                 string pylonText = string.Join(" ", _currentPylonList.Select(p => PylonDisplayName(p.Type)));
@@ -1059,6 +1076,7 @@ namespace Turbo.Plugins.Default
                         case "thresh_red":     double tr; if (double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out tr) && tr > 0) _threshRedSec    = tr; break;
                         case "reset_action":   if (val == "archive" || val == "delete") _resetAction = val; break;
                         case "show_pylons":    _showPylons = val.ToLowerInvariant() != "no"; break;
+                        case "show_floors":    _showFloor  = val.ToLowerInvariant() == "yes"; break;
                         case "show_stats":     _showStats  = val.ToLowerInvariant() != "no"; break;
                         case "debug":          _debugEnabled = val.ToLowerInvariant() == "yes"; break;
                         case "debug_vars":     _debugVars = val.Trim(); break;
@@ -1089,6 +1107,7 @@ namespace Turbo.Plugins.Default
                     "#               archive = rename GRiftHistory.csv with timestamp (default)",
                     "#               delete  = permanently delete",
                     "# show_pylons   : show the Pylons column  yes | no",
+                    "# show_floors   : show the Floors column  yes | no",
                     "# show_stats    : show the stats box below history  yes | no",
                     "# debug         : show debug window  yes | no",
                     "# debug_vars    : variables to watch  pylons | shrines | markers | rift_state",
@@ -1101,6 +1120,7 @@ namespace Turbo.Plugins.Default
                     "thresh_red="    + _threshRedSec.ToString(CultureInfo.InvariantCulture),
                     "reset_action="  + _resetAction,
                     "show_pylons="   + (_showPylons ? "yes" : "no"),
+                    "show_floors="   + (_showFloor  ? "yes" : "no"),
                     "show_stats="    + (_showStats  ? "yes" : "no"),
                     "debug="         + (_debugEnabled ? "yes" : "no"),
                     "debug_vars="    + _debugVars,
@@ -1153,7 +1173,8 @@ namespace Turbo.Plugins.Default
                             pylons.Add(new PylonRecord { Type = st, TextureSno = sno, TextureFrame = frame });
                         }
                     }
-                    _history.Add(new RiftRun { Number = num, GRLevel = lvl, ElapsedSeconds = sec, Completed = ok, Pylons = pylons });
+                    _history.Add(new RiftRun { Number = num, GRLevel = lvl, ElapsedSeconds = sec, Completed = ok, Pylons = pylons,
+                        FloorCount = (p.Length >= 6 && int.TryParse(p[5].Trim(), out int fc) ? fc : 1) });
                 }
 
                 if (_history.Count > 0)
@@ -1225,8 +1246,8 @@ namespace Turbo.Plugins.Default
                     ? string.Join("|", run.Pylons.Select(p => p.TextureSno + ":" + p.TextureFrame + ":" + PylonCsvKey(p.Type)))
                     : "";
                 var line = string.Format(CultureInfo.InvariantCulture,
-                    "{0},{1},{2:F1},{3},{4}",
-                    run.Number, run.GRLevel, run.ElapsedSeconds, run.Completed ? "1" : "0", pylonsCsv);
+                    "{0},{1},{2:F1},{3},{4},{5}",
+                    run.Number, run.GRLevel, run.ElapsedSeconds, run.Completed ? "1" : "0", pylonsCsv, run.FloorCount);
                 File.AppendAllText(_historyFile, line + Environment.NewLine);
             }
             catch { }
