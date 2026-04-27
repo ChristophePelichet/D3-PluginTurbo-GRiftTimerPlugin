@@ -27,3 +27,17 @@ Capture and display the name of the rift guardian (final boss) for each run.
 - Capture name in `AfterCollect()` when a `MonsterPriority.boss` monster is detected in GR
 - Display in the Result column or as a tooltip/extra column
 - Persist in CSV (add 8th field)
+
+---
+
+## 2. Follower death tracking (idea — low priority)
+
+Tracker les morts du follower (Templier, Enchanteresse, Brigand) pendant un GR.
+
+**Notes techniques :**
+- Pas de `IsDead` direct sur le follower — surveiller `HP <= 0` ou disparition de l'acteur
+- Follower absent en groupe (solo seulement)
+- Sa mort n'inflige aucune pénalité de temps dans le GR
+- À n'afficher que si pertinent (colonne dédiée ou info complémentaire dans `†`)
+
+**Décision à prendre :** colonne séparée ou fusionné dans la colonne `†` existante ?

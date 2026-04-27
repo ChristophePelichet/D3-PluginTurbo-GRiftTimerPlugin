@@ -100,10 +100,11 @@ namespace Turbo.Plugins.Default
         private double _threshRedSec    = 100.0;  // orange below, red above (default 1:40)
 
         // ── Column visibility ─────────────────────────────────────────────
-        private bool _showDeaths = false;
-        private bool _showFloor  = false;
-        private bool _showPylons = false;
-        private bool _showStats  = true;
+        private bool _showDeaths    = false;
+        private bool _showFloor     = false;
+        private bool _showPylons    = false;
+        private bool _showStats     = true;
+        private bool _showInventory = true;
 
         // ── Debug window ─────────────────────────────────────────────
         private bool   _debugEnabled = false;
@@ -203,6 +204,8 @@ namespace Turbo.Plugins.Default
                         case "timeout":    return "✗ Timeout";
                         case "waiting":    return "En attente d'un GR...";  // kept for compat
                         case "no_history": return "Aucune run terminée";
+                        case "bag":        return "Sac";
+                        case "shards":     return "Cristaux";
                     }
                     break;
             }
@@ -219,6 +222,8 @@ namespace Turbo.Plugins.Default
                 case "timeout":    return "✗ Timeout";
                 case "waiting":    return "Waiting for a GR...";
                 case "no_history": return "No completed runs yet";
+                case "bag":        return "Bag";
+                case "shards":     return "Shards";
                 default:           return key;
             }
         }
@@ -646,7 +651,10 @@ namespace Turbo.Plugins.Default
             int  historyRows  = _history.Count == 0 ? 1 : _history.Count;
 
             // Layout: HDR_H | COL_H | BAR_ROW_H | sep | historyRows*ROW_H | PAD | STATS_ROW
-            float bodyH  = COL_H + BAR_ROW_H + 1f + historyRows * ROW_H + (_showStats ? PAD + ROW_H : 0f);
+            float bodyH  = COL_H + BAR_ROW_H + 1f + historyRows * ROW_H
+                         + ((_showStats || _showInventory) ? PAD : 0f)
+                         + (_showStats     ? ROW_H : 0f)
+                         + (_showInventory ? ROW_H : 0f);
             float totalH = HDR_H + bodyH;
 
             _winX = Math.Max(0, Math.Min(_winX, Hud.Window.Size.Width  - WIN_W));
@@ -762,6 +770,37 @@ namespace Turbo.Plugins.Default
                     var tlNo = _colFont.GetTextLayout("\u00f8 --:--:---");
                     _colFont.DrawText(tlNo, _winX + PAD, statsY + (statsH - tlNo.Metrics.Height) / 2f);
                 }
+            }
+
+            // ── Inventory row (below stats box) ────────────────────────────────────────
+            if (_showInventory)
+            {
+                float invY = (_showStats ? ry + PAD + ROW_H : ry + PAD);
+                float invH = ROW_H;
+                _bgBrush    .DrawRectangle(_winX, invY, WIN_W, invH);
+                _borderBrush.DrawRectangle(_winX, invY, WIN_W, invH);
+
+                // ── Bag: slots libres / total ─────────────────────────────────────────
+                int freeSlots  = Hud.Game.Me.InventorySpaceTotal - Hud.Game.InventorySpaceUsed;
+                int totalSlots = Hud.Game.Me.InventorySpaceTotal;
+                IFont bagFont  = freeSlots < 5  ? _badFont
+                               : freeSlots < 15 ? _warnFont
+                               : _goodFont;
+                var tlBagLbl = _colFont.GetTextLayout("B");
+                var tlBagVal = bagFont .GetTextLayout(freeSlots + " / " + totalSlots);
+                _colFont.DrawText(tlBagLbl, _winX + PAD, invY + (invH - tlBagLbl.Metrics.Height) / 2f);
+                bagFont .DrawText(tlBagVal, _winX + PAD + tlBagLbl.Metrics.Width + 8f, invY + (invH - tlBagVal.Metrics.Height) / 2f);
+
+                // ── Blood shards: actuel / max ────────────────────────────────────────
+                long shards    = Hud.Game.Me.Materials.BloodShard;
+                long maxShards = 500L + (Hud.Game.Me.HighestSoloRiftLevel * 10L);
+                long remain    = maxShards - shards;
+                IFont shardFont = remain < 100 ? _badFont
+                                : remain < 300 ? _warnFont
+                                : _normFont;
+                string shardText = "\u25c6 " + shards + " / " + maxShards;
+                var tlShard = shardFont.GetTextLayout(shardText);
+                shardFont.DrawText(tlShard, _winX + WIN_W / 2f, invY + (invH - tlShard.Metrics.Height) / 2f);
             }
 
             // ── Pylons legend tooltip ─────────────────────────────────────────────────
@@ -1130,7 +1169,8 @@ namespace Turbo.Plugins.Default
                         case "show_pylons":    _showPylons = val.ToLowerInvariant() != "no"; break;
                         case "show_floors":    _showFloor  = val.ToLowerInvariant() == "yes"; break;
                         case "show_deaths":    _showDeaths = val.ToLowerInvariant() == "yes"; break;
-                        case "show_stats":     _showStats  = val.ToLowerInvariant() != "no"; break;
+                        case "show_stats":      _showStats     = val.ToLowerInvariant() != "no"; break;
+                        case "show_inventory":  _showInventory = val.ToLowerInvariant() != "no"; break;
                         case "debug":          _debugEnabled = val.ToLowerInvariant() == "yes"; break;
                         case "debug_vars":     _debugVars = val.Trim(); break;
                     }
@@ -1162,7 +1202,8 @@ namespace Turbo.Plugins.Default
                     "# show_pylons   : show the Pylons column  yes | no",
                     "# show_floors   : show the Floors column  yes | no",
                     "# show_deaths   : show the Deaths column  yes | no",
-                    "# show_stats    : show the stats box below history  yes | no",
+                    "# show_stats      : show the stats box below history        yes | no",
+                    "# show_inventory  : show bag slots + blood shards row          yes | no",
                     "# debug         : show debug window  yes | no",
                     "# debug_vars    : variables to watch  pylons | shrines | markers | rift_state",
                     "#               multiple vars: debug_vars=pylons,shrines",
@@ -1176,7 +1217,8 @@ namespace Turbo.Plugins.Default
                     "show_pylons="   + (_showPylons ? "yes" : "no"),
                     "show_floors="   + (_showFloor  ? "yes" : "no"),
                     "show_deaths="   + (_showDeaths ? "yes" : "no"),
-                    "show_stats="    + (_showStats  ? "yes" : "no"),
+                    "show_stats="     + (_showStats     ? "yes" : "no"),
+                    "show_inventory=" + (_showInventory ? "yes" : "no"),
                     "debug="         + (_debugEnabled ? "yes" : "no"),
                     "debug_vars="    + _debugVars,
                     "#",

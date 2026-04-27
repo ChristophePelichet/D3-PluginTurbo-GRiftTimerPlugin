@@ -22,12 +22,18 @@
 │  ...                                                               │  │ (× max_runs rows)
 │                                                                    │  │ ← PAD = 8px gap (empty space)
 ├────────────────────────────────────────────────────────────────────┤ ─┤
-│  ø 01:43:909 (10)  Σ 17:39:090 / 10                               │  │ ROW_H = 28px  (stats box)
+│  ø 01:43:909 (10)  Σ 17:39:090 / 10                               │  │ ROW_H = 28px  (stats box)      ← si show_stats=yes
+├────────────────────────────────────────────────────────────────────┤ ─┤
+│  B  20 / 60                    ◆ 1400 / 1900                       │  │ ROW_H = 28px  (inventory row)  ← si show_inventory=yes
 └────────────────────────────────────────────────────────────────────┘ ─┘
 
-Vertical stacking formula:
-  totalH = HDR_H + COL_H + BAR_ROW_H + 1 + (max_runs × ROW_H) + PAD + ROW_H
-         = 32    + 28    + 26         + 1 + (N × 28)           + 8   + 28
+Vertical stacking formula (tous actifs) :
+  totalH = HDR_H + COL_H + BAR_ROW_H + 1 + (max_runs × ROW_H) + PAD + ROW_H + ROW_H
+         = 32    + 28    + 26         + 1 + (N × 28)           + 8   + 28    + 28
+
+Si show_stats=no et show_inventory=no → aucun PAD ni ligne supplémentaire.
+Si un seul des deux est actif → PAD + ROW_H (un seul bloc).
+Si les deux sont actifs → PAD + ROW_H (stats) + ROW_H (inventory).
 ```
 
 ---
@@ -40,9 +46,9 @@ Vertical stacking formula:
 | `WIN_W` (property) | computed | `WIN_W_BASE + optional widths`. Use this everywhere in rendering code. |
 | `HDR_H` | `32f` | Header row height — title + buttons. Increase for more air around the title. |
 | `COL_H` | `28f` | Column header row height (#, GR, Time, Result). |
-| `ROW_H` | `28f` | Height of each history row **and** the stats box row. |
+| `ROW_H` | `28f` | Height of each history row, the stats box row, **and the inventory row**. |
 | `BAR_ROW_H` | `26f` | Height of the live timer bar row. |
-| `PAD` | `8f` | Gap between last history row and stats box. Also used as left margin. |
+| `PAD` | `8f` | Gap between last history row and the first bottom block (stats or inventory). Also used as left margin. Added **once** when at least one of `_showStats` / `_showInventory` is active. |
 
 ---
 
