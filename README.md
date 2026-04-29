@@ -23,6 +23,7 @@ TurboHUD plugin for Diablo III — Greater Rift history with real-time timer.
 - **Draggable window**: drag the title bar to reposition
 - **Hot-reload config**: edit `.cfg` while in-game, changes apply instantly
 - **Archive on reset**: pressing `[R]` renames the CSV with a timestamp instead of deleting it
+- **Inventory row** (optional, `show_inventory=yes`): 4 columns — bag free/total slots · blood shards vs cap · Cube recipe 2 (Law of Kulle) craft count · Cube recipe 3 (Hope of Cain) craft count
 
 ### Installation
 
@@ -107,6 +108,7 @@ Plugin TurboHUD pour Diablo III — Historique des Greater Rifts avec timer en t
 - **Fenêtre repositionnable** par drag sur la barre de titre
 - **Config à chaud** : modifier le `.cfg` pendant le jeu, les changements s'appliquent immédiatement
 - **Archive au reset** : `[R]` renomme le CSV avec un horodatage au lieu de le supprimer
+- **Ligne inventaire** (optionnelle, `show_inventory=yes`) : 4 colonnes — slots de sac libres/total · éclats de sang vs plafond · recette cube 2 (Loi de Kulle) · recette cube 3 (Espoir de Caïn)
 
 ### Installation
 

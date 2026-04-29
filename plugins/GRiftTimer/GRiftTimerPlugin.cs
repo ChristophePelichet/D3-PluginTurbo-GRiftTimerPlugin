@@ -173,6 +173,9 @@ namespace Turbo.Plugins.Default
         // ── Fonts ─────────────────────────────────────────────────────────────
         private IFont _hdrFont;
         private IFont _colFont;
+
+        // ── Textures ──────────────────────────────────────────────────────────
+        private ITexture _cubeTexture;
         private IFont _rowFont;
         private IFont _curFont;
         private IFont _goodFont;
@@ -275,6 +278,8 @@ namespace Turbo.Plugins.Default
             _warnFont = Hud.Render.CreateFont("tahoma",  7.5f, 230, 220, 140,  40, false, false, 150, 0, 0, 0, true);
             _normFont = Hud.Render.CreateFont("tahoma",  7.5f, 220, 215, 215, 215, false, false, 150, 0, 0, 0, true);
             _badFont  = Hud.Render.CreateFont("tahoma",  7.5f, 230, 210,  80,  80, false, false, 150, 0, 0, 0, true);
+
+            _cubeTexture = Hud.Texture.KanaiCubeTexture;
 
             LoadConfig();
             LoadHistory();
@@ -763,12 +768,12 @@ namespace Turbo.Plugins.Default
                                    : _badFont;
                     string avgTxt  = "\u00f8 " + FormatTime(avg) + " (" + completedRuns.Count + ")  \u03a3 " + FormatTime(total) + " / " + completedRuns.Count;
                     var tlAvg = avgFont.GetTextLayout(avgTxt);
-                    avgFont.DrawText(tlAvg, _winX + PAD, statsY + (statsH - tlAvg.Metrics.Height) / 2f);
+                    avgFont.DrawText(tlAvg, _winX + (WIN_W - tlAvg.Metrics.Width) / 2f, statsY + (statsH - tlAvg.Metrics.Height) / 2f);
                 }
                 else
                 {
                     var tlNo = _colFont.GetTextLayout("\u00f8 --:--:---");
-                    _colFont.DrawText(tlNo, _winX + PAD, statsY + (statsH - tlNo.Metrics.Height) / 2f);
+                    _colFont.DrawText(tlNo, _winX + (WIN_W - tlNo.Metrics.Width) / 2f, statsY + (statsH - tlNo.Metrics.Height) / 2f);
                 }
             }
 
@@ -786,21 +791,58 @@ namespace Turbo.Plugins.Default
                 IFont bagFont  = freeSlots < 5  ? _badFont
                                : freeSlots < 15 ? _warnFont
                                : _goodFont;
-                var tlBagLbl = _colFont.GetTextLayout("B");
-                var tlBagVal = bagFont .GetTextLayout(freeSlots + " / " + totalSlots);
-                _colFont.DrawText(tlBagLbl, _winX + PAD, invY + (invH - tlBagLbl.Metrics.Height) / 2f);
-                bagFont .DrawText(tlBagVal, _winX + PAD + tlBagLbl.Metrics.Width + 8f, invY + (invH - tlBagVal.Metrics.Height) / 2f);
 
-                // ── Blood shards: actuel / max ────────────────────────────────────────
+                float col  = WIN_W / 4f;
+                float midY = invY + invH / 2f;
+                float iconSz = invH + 16f;
+                float iconY  = invY + (invH - iconSz) / 2f;
+
+                // Col 1 centré — Bag slots
+                var tlBagVal = bagFont.GetTextLayout(freeSlots + " / " + totalSlots);
+                bagFont.DrawText(tlBagVal, _winX + (col - tlBagVal.Metrics.Width) / 2f, midY - tlBagVal.Metrics.Height / 2f);
+
+                // Séparateur 1 — frontière 1/4
+                var tlSep1 = _colFont.GetTextLayout("|");
+                _colFont.DrawText(tlSep1, _winX + col - tlSep1.Metrics.Width / 2f, midY - tlSep1.Metrics.Height / 2f);
+
+                // Col 2 centré — Blood shards
                 long shards    = Hud.Game.Me.Materials.BloodShard;
                 long maxShards = 500L + (Hud.Game.Me.HighestSoloRiftLevel * 10L);
                 long remain    = maxShards - shards;
                 IFont shardFont = remain < 100 ? _badFont
                                 : remain < 300 ? _warnFont
                                 : _normFont;
-                string shardText = "\u25c6 " + shards + " / " + maxShards;
-                var tlShard = shardFont.GetTextLayout(shardText);
-                shardFont.DrawText(tlShard, _winX + WIN_W / 2f, invY + (invH - tlShard.Metrics.Height) / 2f);
+                const float shardPad = 8f;
+                var tlShard = shardFont.GetTextLayout("\u25c6 " + shards + " / " + maxShards);
+                shardFont.DrawText(tlShard, _winX + col + shardPad + (col - 2f * shardPad - tlShard.Metrics.Width) / 2f, midY - tlShard.Metrics.Height / 2f);
+
+                // Séparateur 2 — frontière 2/4
+                var tlSep2 = _colFont.GetTextLayout("|");
+                _colFont.DrawText(tlSep2, _winX + 2f * col - tlSep2.Metrics.Width / 2f, midY - tlSep2.Metrics.Height / 2f);
+
+                // Col 3 centré — Cube recipe 2 (Loi de Kulle)
+                long kulle      = CalcLawOfKulle();
+                IFont kulleFont = kulle > 0 ? _normFont : _badFont;
+                var tlKulle     = kulleFont.GetTextLayout("2 : " + kulle);
+                float kulleBlockW = iconSz + 3f + tlKulle.Metrics.Width;
+                float kulleBlockX = _winX + 2f * col + (col - kulleBlockW) / 2f;
+                if (_cubeTexture != null)
+                    _cubeTexture.Draw(kulleBlockX, iconY, iconSz, iconSz);
+                kulleFont.DrawText(tlKulle, kulleBlockX + iconSz + 3f, midY - tlKulle.Metrics.Height / 2f);
+
+                // Séparateur 3 — frontière 3/4
+                var tlSep3 = _colFont.GetTextLayout("|");
+                _colFont.DrawText(tlSep3, _winX + 3f * col - tlSep3.Metrics.Width / 2f, midY - tlSep3.Metrics.Height / 2f);
+
+                // Col 4 centré — Cube recipe 3 (L'Espoir de Caïn)
+                long hope      = CalcHopeOfCain();
+                IFont hopeFont = hope > 0 ? _normFont : _badFont;
+                var tlHope     = hopeFont.GetTextLayout("3 : " + hope);
+                float hopeBlockW = iconSz + 3f + tlHope.Metrics.Width;
+                float hopeBlockX = _winX + 3f * col + (col - hopeBlockW) / 2f;
+                if (_cubeTexture != null)
+                    _cubeTexture.Draw(hopeBlockX, iconY, iconSz, iconSz);
+                hopeFont.DrawText(tlHope, hopeBlockX + iconSz + 3f, midY - tlHope.Metrics.Height / 2f);
             }
 
             // ── Pylons legend tooltip ─────────────────────────────────────────────────
@@ -813,6 +855,31 @@ namespace Turbo.Plugins.Default
         }
 
         // ── Render helpers ───────────────────────────────────────────────────────────
+
+        // ── Loi de Kulle: min crafts possible from current materials ─────────
+        // Recipe 2: 5× each of the 5 act essences + 50× Forgotten Souls
+        private long CalcLawOfKulle()
+        {
+            var m = Hud.Game.Me.Materials;
+            return Math.Min(
+                Math.Min(m.KhanduranRune    / 5L, m.CaldeumNightShade   / 5L),
+                Math.Min(
+                    Math.Min(m.ArreatWarTapestry / 5L, m.CorruptedAngelFlesh / 5L),
+                    Math.Min(m.WestmarchHolyWater / 5L, m.ForgottenSoul      / 50L)
+                )
+            );
+        }
+
+        // ── L'Espoir de Caïn: min crafts possible from current materials ─────
+        // Recipe 3: 25× Death's Breath + 50× Reusable Parts + 50× Arcane Dust + 50× Veiled Crystal
+        private long CalcHopeOfCain()
+        {
+            var m = Hud.Game.Me.Materials;
+            return Math.Min(
+                Math.Min(m.DeathsBreath / 25L, m.ReusableParts / 50L),
+                Math.Min(m.ArcaneDust   / 50L, m.VeiledCrystal / 50L)
+            );
+        }
 
         private void DrawPylonTooltip()
         {
