@@ -100,3 +100,32 @@ float bodyH = COL_H + BAR_ROW_H + 1f + historyRows * ROW_H
 | `tlBagLbl` | Text layout for the `B` label |
 | `tlBagVal` | Text layout for `free / total` |
 | `tlShard` | Text layout for `◆ current / max` |
+
+---
+
+## Recipe breakdown tooltips
+
+Hovering the **col 3** (Kulle) or **col 4** (Hope of Cain) zone of the inventory row pops a floating tooltip with the full ingredient breakdown for that recipe.
+
+### Positioning rules
+
+| Axis | Rule |
+|------|------|
+| Horizontal | Appears to the **right** of the main window (`_winX + WIN_W + 6f`). Falls back to the **left** (`_winX − ttW − 6f`) if it would overflow the screen right edge. |
+| Vertical | **Bottom-aligned** with the inventory row: `ttY = invY + invH − ttH`. Clamped upward if `ttY < 0`, clamped downward if it would overflow the screen bottom. |
+
+Bottom-alignment means the tooltip's lower border is flush with the bottom edge of the main box regardless of how many ingredient rows it contains (Recipe 2 has 6 rows, Recipe 3 has 4 rows).
+
+### Layout constants (local to `DrawRecipeTooltip`)
+
+| Constant | Value | Role |
+|----------|-------|------|
+| `TT_PAD` | `6f` | Inner padding (top, bottom, left, right) |
+| `TT_ROW` | `20f` | Height of each row (title row + each ingredient row) |
+| `COL_GAP` | `12f` | Gap between name → qty, qty → arrow (`→`), arrow → craft count |
+
+Column widths (`maxNameW`, `maxQtyW`, `maxNW`) are **measured** from actual text layouts so they adapt automatically to the font and language (`fr` / `en`).
+
+### Color coding
+
+The ingredient whose craft count equals `minCrafts` (the bottleneck) is rendered in `_badFont` (red). All other ingredients use `_normFont` (white).

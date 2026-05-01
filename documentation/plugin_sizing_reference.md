@@ -128,6 +128,19 @@ The header contains (left to right):
 
 ---
 
+## Recipe tooltip positioning
+
+The `DrawRecipeTooltip` method renders a floating panel beside the main window when the cursor hovers the Cube recipe zone (col 3 or col 4) of the inventory row.
+
+| Axis | Formula | Notes |
+|------|---------|-------|
+| X | `_winX + WIN_W + 6f` | Falls back to `_winX − ttW − 6f` if it would overflow the screen right edge |
+| Y | `invY + invH − ttH` | **Bottom-aligned** with the inventory row — the tooltip grows upward from `invY + invH`. Clamped: `max(0, min(y, screenH − ttH))` |
+
+This ensures the tooltip's bottom border is always flush with the bottom of the main box, regardless of the number of ingredient rows.
+
+---
+
 ## How to add a new optional column
 
 1. Add width constant: `private const float WIN_W_NEW = Xf;`

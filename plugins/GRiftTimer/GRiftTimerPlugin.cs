@@ -16,7 +16,7 @@ namespace Turbo.Plugins.Default
     ///   - GR level
     ///   - Result (killed in time or timeout)
     /// Window is repositionable by dragging the title bar.
-    /// Toggle: T key
+    /// Toggle: Ctrl+T by default (configurable via toggle_key in .cfg)
     /// </summary>
     public class GRiftTimerPlugin : BasePlugin, IInGameTopPainter, IAfterCollectHandler, IKeyEventHandler
     {
@@ -94,6 +94,10 @@ namespace Turbo.Plugins.Default
         // ── Localization ──────────────────────────────────────────────────────
         // Supported values: en, fr, de, es
         private string _lang = "en";
+
+        // ── Toggle key ────────────────────────────────────────────────────────
+        // Format: [ctrl+][shift+][alt+]<letter>  e.g. "ctrl+t" or "t"
+        private string _toggleKeyCfg = "ctrl+t";
 
         // ── Timer bar color thresholds ─────────────────────────────────────────
         private double _threshOrangeSec = 90.0;   // green below, orange above (default 1:30)
@@ -252,7 +256,6 @@ namespace Turbo.Plugins.Default
             try { Directory.CreateDirectory(dataDir); } catch { }
             try { Directory.CreateDirectory(csvDir);  } catch { }
 
-            ToggleKeyEvent = Hud.Input.CreateKeyEvent(true, Key.T, false, false, false);
             ConfigKeyEvent = Hud.Input.CreateKeyEvent(true, Key.S, true, false, true);
 
             _bgBrush        = Hud.Render.CreateBrush(210,  12,  12,  18, 0);
@@ -282,12 +285,34 @@ namespace Turbo.Plugins.Default
             _cubeTexture = Hud.Texture.KanaiCubeTexture;
 
             LoadConfig();
+            ApplyToggleKey();
             LoadHistory();
             EnsureCsvExists();
             InitCfgWatcher();
         }
 
         // ── Key toggle ────────────────────────────────────────────────────────
+
+        private void ApplyToggleKey()
+        {
+            bool ctrl = false, shift = false, alt = false;
+            Key  key   = Key.T;
+            var  parts = _toggleKeyCfg.ToLowerInvariant().Split('+');
+            foreach (var part in parts)
+            {
+                var t = part.Trim();
+                if      (t == "ctrl")  ctrl  = true;
+                else if (t == "shift") shift = true;
+                else if (t == "alt")   alt   = true;
+                else if (t.Length > 0)
+                {
+                    Key parsed;
+                    if (Enum.TryParse(t.ToUpper(), true, out parsed))
+                        key = parsed;
+                }
+            }
+            ToggleKeyEvent = Hud.Input.CreateKeyEvent(true, key, ctrl, shift, alt);
+        }
 
         public void OnKeyEvent(IKeyEvent keyEvent)
         {
@@ -363,7 +388,7 @@ namespace Turbo.Plugins.Default
         public void AfterCollect()
         {
             // Hot-reload config if the file has changed
-            if (_cfgDirty) { _cfgDirty = false; LoadConfig(); LoadHistory(); }
+            if (_cfgDirty) { _cfgDirty = false; LoadConfig(); ApplyToggleKey(); LoadHistory(); }
 
             if (!Hud.Game.IsInGame)
             {
@@ -843,6 +868,10 @@ namespace Turbo.Plugins.Default
                 if (_cubeTexture != null)
                     _cubeTexture.Draw(hopeBlockX, iconY, iconSz, iconSz);
                 hopeFont.DrawText(tlHope, hopeBlockX + iconSz + 3f, midY - tlHope.Metrics.Height / 2f);
+
+                // Recipe breakdown tooltips (hover on col 3 or col 4)
+                DrawRecipeTooltip(2, invY, invH);
+                DrawRecipeTooltip(3, invY, invH);
             }
 
             // ── Pylons legend tooltip ─────────────────────────────────────────────────
@@ -879,6 +908,109 @@ namespace Turbo.Plugins.Default
                 Math.Min(m.DeathsBreath / 25L, m.ReusableParts / 50L),
                 Math.Min(m.ArcaneDust   / 50L, m.VeiledCrystal / 50L)
             );
+        }
+
+        private void DrawRecipeTooltip(int recipe, float invY, float invH)
+        {
+            float col   = WIN_W / 4f;
+            float zoneX = recipe == 2 ? _winX + 2f * col : _winX + 3f * col;
+            if (!Hud.Window.CursorInsideRect(zoneX, invY, col, invH)) return;
+
+            bool     fr = _lang == "fr";
+            var      m  = Hud.Game.Me.Materials;
+            string   title;
+            string[] names;
+            long[]   qtys;
+            long[]   reqs;
+
+            if (recipe == 2)
+            {
+                title = fr ? "Recette 2 \u2014 Loi de Kulle" : "Recipe 2 \u2014 Law of Kulle";
+                names = fr
+                    ? new[] { "Rune de Khanduras", "Belladone de Caldeum", "Tapisserie d'Arreat",
+                              "Chair d'ange corrompue", "Eau sainte de Westmarch", "\u00c2me oubli\u00e9e" }
+                    : new[] { "Khanduran Rune", "Caldeum Nightshade", "Arreat War Tapestry",
+                              "Corrupted Angel Flesh", "Westmarch Holy Water", "Forgotten Soul" };
+                qtys = new long[] { m.KhanduranRune, m.CaldeumNightShade, m.ArreatWarTapestry,
+                                    m.CorruptedAngelFlesh, m.WestmarchHolyWater, m.ForgottenSoul };
+                reqs = new long[] { 5L, 5L, 5L, 5L, 5L, 50L };
+            }
+            else
+            {
+                title = fr ? "Recette 3 \u2014 L'Espoir de Ca\u00efn" : "Recipe 3 \u2014 Hope of Cain";
+                names = fr
+                    ? new[] { "Souffle de mort", "Pi\u00e8ces r\u00e9utilisables",
+                              "Poussi\u00e8re arcanique", "Cristal voil\u00e9" }
+                    : new[] { "Death's Breath", "Reusable Parts", "Arcane Dust", "Veiled Crystal" };
+                qtys = new long[] { m.DeathsBreath, m.ReusableParts, m.ArcaneDust, m.VeiledCrystal };
+                reqs = new long[] { 25L, 50L, 50L, 50L };
+            }
+
+            long[] crafts    = new long[names.Length];
+            long   minCrafts = long.MaxValue;
+            for (int i = 0; i < names.Length; i++)
+            {
+                crafts[i] = qtys[i] / reqs[i];
+                if (crafts[i] < minCrafts) minCrafts = crafts[i];
+            }
+
+            const float TT_PAD    = 6f;
+            const float TT_ROW    = 20f;
+            const float COL_GAP   = 12f;   // gap between name and qty, qty and arrow, arrow and result
+
+            // Pre-measure all layouts so column positions adapt to actual rendered widths
+            var tlsName  = new SharpDX.DirectWrite.TextLayout[names.Length];
+            var tlsQty   = new SharpDX.DirectWrite.TextLayout[names.Length];
+            var tlsN     = new SharpDX.DirectWrite.TextLayout[names.Length];
+            float maxNameW = 0f, maxQtyW = 0f, maxNW = 0f;
+            for (int i = 0; i < names.Length; i++)
+            {
+                IFont nf   = crafts[i] == minCrafts ? _badFont : _normFont;
+                tlsName[i] = nf.GetTextLayout(names[i]);
+                tlsQty [i] = nf.GetTextLayout(qtys[i] + " / " + reqs[i]);
+                tlsN   [i] = nf.GetTextLayout(crafts[i].ToString());
+                if (tlsName[i].Metrics.Width > maxNameW) maxNameW = tlsName[i].Metrics.Width;
+                if (tlsQty [i].Metrics.Width > maxQtyW)  maxQtyW  = tlsQty [i].Metrics.Width;
+                if (tlsN   [i].Metrics.Width > maxNW)    maxNW    = tlsN   [i].Metrics.Width;
+            }
+            var   tlArrow  = _normFont.GetTextLayout("\u2192");
+            float arrowW   = tlArrow.Metrics.Width;
+
+            float colQty   = TT_PAD + maxNameW + COL_GAP;
+            float colArr   = colQty  + maxQtyW  + COL_GAP;
+            float colN     = colArr  + arrowW   + COL_GAP;
+            float ttW      = colN + maxNW + TT_PAD;
+            float ttH      = TT_PAD + TT_ROW + names.Length * TT_ROW + TT_PAD;
+
+            // Always show to the side of the main window
+            float ttX = _winX + WIN_W + 6f;
+            if (ttX + ttW > Hud.Window.Size.Width)
+                ttX = _winX - ttW - 6f;
+
+            // Align bottom of tooltip with bottom of main box, clamp to screen edges
+            float ttY = invY + invH - ttH;
+            if (ttY < 0f) ttY = 0f;
+            if (ttY + ttH > Hud.Window.Size.Height)
+                ttY = Hud.Window.Size.Height - ttH;
+
+            _bgBrush    .DrawRectangle(ttX, ttY, ttW, ttH);
+            _borderBrush.DrawRectangle(ttX, ttY, ttW, ttH);
+
+            var tlTitle = _colFont.GetTextLayout(title);
+            _colFont.DrawText(tlTitle, ttX + TT_PAD, ttY + TT_PAD + (TT_ROW - tlTitle.Metrics.Height) / 2f);
+
+            for (int i = 0; i < names.Length; i++)
+            {
+                float rowY    = ttY + TT_PAD + TT_ROW + i * TT_ROW;
+                bool  isBn    = crafts[i] == minCrafts;
+                IFont nf      = isBn ? _badFont : _normFont;
+                float rowMidY = rowY + TT_ROW / 2f;
+
+                nf       .DrawText(tlsName[i], ttX + TT_PAD, rowMidY - tlsName[i].Metrics.Height / 2f);
+                nf       .DrawText(tlsQty [i], ttX + colQty, rowMidY - tlsQty [i].Metrics.Height / 2f);
+                _normFont.DrawText(tlArrow,    ttX + colArr, rowMidY - tlArrow    .Metrics.Height / 2f);
+                nf       .DrawText(tlsN   [i], ttX + colN,   rowMidY - tlsN   [i].Metrics.Height / 2f);
+            }
         }
 
         private void DrawPylonTooltip()
@@ -1240,6 +1372,7 @@ namespace Turbo.Plugins.Default
                         case "show_inventory":  _showInventory = val.ToLowerInvariant() != "no"; break;
                         case "debug":          _debugEnabled = val.ToLowerInvariant() == "yes"; break;
                         case "debug_vars":     _debugVars = val.Trim(); break;
+                        case "toggle_key":     if (!string.IsNullOrWhiteSpace(val)) _toggleKeyCfg = val.ToLowerInvariant(); break;
                     }
                 }
             }
@@ -1274,6 +1407,8 @@ namespace Turbo.Plugins.Default
                     "# debug         : show debug window  yes | no",
                     "# debug_vars    : variables to watch  pylons | shrines | markers | rift_state",
                     "#               multiple vars: debug_vars=pylons,shrines",
+                    "# toggle_key    : key to show/hide the window  format: [ctrl+][shift+][alt+]<letter>",
+                    "#               examples: ctrl+t  |  t  |  alt+g",
                     "#",
                     "lang="          + _lang,
                     "max_runs="      + _maxRuns.ToString(CultureInfo.InvariantCulture),
@@ -1288,6 +1423,7 @@ namespace Turbo.Plugins.Default
                     "show_inventory=" + (_showInventory ? "yes" : "no"),
                     "debug="         + (_debugEnabled ? "yes" : "no"),
                     "debug_vars="    + _debugVars,
+                    "toggle_key="    + _toggleKeyCfg,
                     "#",
                     "# Window position (updated automatically when dragging)",
                     "x="    + _winX.ToString(CultureInfo.InvariantCulture),
